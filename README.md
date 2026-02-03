@@ -2,11 +2,11 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>Mini RPG</title>
+<title>Advanced RPG</title>
 
 <style>
   body {
-    background: #111;
+    background: #0d0d0d;
     color: #fff;
     font-family: sans-serif;
     display: flex;
@@ -16,126 +16,211 @@
   }
 
   .game {
-    width: 380px;
-    background: #1e1e1e;
+    width: 400px;
+    background: #1b1b1b;
     border-radius: 15px;
-    padding: 20px;
-    box-shadow: 0 0 20px rgba(0,255,200,0.2);
+    padding: 15px;
   }
 
-  h1 {
-    text-align: center;
+  .screen {
+    display: none;
   }
 
-  .status {
+  .active {
+    display: block;
+  }
+
+  .map {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 5px;
+    margin: 10px 0;
+  }
+
+  .cell {
+    height: 50px;
+    background: #333;
     display: flex;
-    justify-content: space-between;
-    margin: 15px 0;
+    justify-content: center;
+    align-items: center;
+    border-radius: 8px;
   }
 
-  .log {
-    background: #000;
-    padding: 10px;
-    height: 100px;
-    overflow-y: auto;
-    font-size: 14px;
-    margin-bottom: 10px;
+  .player {
+    background: #00ffc6;
+    color: #000;
   }
 
   button {
     width: 100%;
     padding: 10px;
-    margin: 5px 0;
-    font-size: 16px;
+    margin-top: 5px;
     border: none;
     border-radius: 10px;
     cursor: pointer;
   }
 
-  .attack { background: #ff5555; }
-  .heal { background: #55ff99; }
+  .log {
+    background: #000;
+    height: 80px;
+    overflow-y: auto;
+    font-size: 13px;
+    padding: 5px;
+  }
 </style>
 </head>
 
 <body>
 
 <div class="game">
-  <h1>⚔️ Mini RPG</h1>
 
-  <div class="status">
-    <div>勇者 HP: <span id="playerHP">100</span></div>
-    <div>魔物 HP: <span id="enemyHP">80</span></div>
+  <div id="status">
+    Lv:<span id="lv">1</span>
+    HP:<span id="hp">100</span>
+    EXP:<span id="exp">0</span>
   </div>
 
-  <div class="log" id="log"></div>
+  <!-- MAP SCREEN -->
+  <div id="mapScreen" class="screen active">
+    <h3>🗺️ フィールド</h3>
+    <div class="map" id="map"></div>
+    <button onclick="move()">進む</button>
+  </div>
 
-  <button class="attack" onclick="attack()">攻撃</button>
-  <button class="heal" onclick="heal()">回復</button>
+  <!-- BATTLE SCREEN -->
+  <div id="battleScreen" class="screen">
+    <h3>⚔️ 戦闘</h3>
+    敵HP: <span id="enemyHP"></span>
+    <div class="log" id="battleLog"></div>
+    <button onclick="attack()">攻撃</button>
+    <button onclick="usePotion()">回復薬</button>
+  </div>
+
 </div>
 
 <script>
-  let playerHP = 100;
-  let enemyHP = 80;
+  // プレイヤー
+  let player = {
+    lv: 1,
+    hp: 100,
+    maxHp: 100,
+    exp: 0,
+    potions: 3,
+    x: 2,
+    y: 2
+  };
 
-  const playerEl = document.getElementById("playerHP");
-  const enemyEl = document.getElementById("enemyHP");
-  const logEl = document.getElementById("log");
+  let enemy = null;
 
-  function log(text) {
-    logEl.innerHTML += text + "<br>";
-    logEl.scrollTop = logEl.scrollHeight;
+  const mapEl = document.getElementById("map");
+  const logEl = document.getElementById("battleLog");
+
+  function drawMap() {
+    mapEl.innerHTML = "";
+    for (let y = 0; y < 5; y++) {
+      for (let x = 0; x < 5; x++) {
+        const cell = document.createElement("div");
+        cell.className = "cell";
+        if (player.x === x && player.y === y) {
+          cell.classList.add("player");
+          cell.textContent = "勇";
+        }
+        mapEl.appendChild(cell);
+      }
+    }
   }
 
-  function update() {
-    playerEl.textContent = playerHP;
-    enemyEl.textContent = enemyHP;
+  function move() {
+    const dir = Math.floor(Math.random() * 4);
+    if (dir === 0 && player.x > 0) player.x--;
+    if (dir === 1 && player.x < 4) player.x++;
+    if (dir === 2 && player.y > 0) player.y--;
+    if (dir === 3 && player.y < 4) player.y++;
+
+    drawMap();
+
+    if (Math.random() < 0.4) startBattle();
+  }
+
+  function startBattle() {
+    enemy = {
+      hp: 30 + player.lv * 10
+    };
+    switchScreen("battleScreen");
+    document.getElementById("enemyHP").textContent = enemy.hp;
+    logEl.innerHTML = "敵が現れた！<br>";
   }
 
   function attack() {
-    const damage = Math.floor(Math.random() * 15) + 5;
-    enemyHP -= damage;
-    log(`勇者の攻撃！ ${damage} ダメージ`);
+    const dmg = Math.floor(Math.random() * 10) + 5;
+    enemy.hp -= dmg;
+    log(`攻撃！${dmg}ダメージ`);
 
-    if (enemyHP <= 0) {
-      enemyHP = 0;
-      update();
-      log("🎉 魔物を倒した！");
-      endGame();
+    if (enemy.hp <= 0) {
+      winBattle();
       return;
     }
 
-    enemyTurn();
-    update();
+    enemyAttack();
   }
 
-  function heal() {
-    const heal = Math.floor(Math.random() * 10) + 8;
-    playerHP += heal;
-    if (playerHP > 100) playerHP = 100;
-    log(`勇者は ${heal} 回復した`);
+  function enemyAttack() {
+    const dmg = Math.floor(Math.random() * 8) + 3;
+    player.hp -= dmg;
+    log(`敵の攻撃！${dmg}ダメージ`);
 
-    enemyTurn();
-    update();
-  }
-
-  function enemyTurn() {
-    const damage = Math.floor(Math.random() * 12) + 4;
-    playerHP -= damage;
-    log(`魔物の攻撃！ ${damage} ダメージ`);
-
-    if (playerHP <= 0) {
-      playerHP = 0;
-      update();
-      log("💀 勇者は倒れた…");
-      endGame();
+    if (player.hp <= 0) {
+      alert("GAME OVER");
+      location.reload();
     }
+
+    updateStatus();
   }
 
-  function endGame() {
-    document.querySelectorAll("button").forEach(btn => btn.disabled = true);
+  function usePotion() {
+    if (player.potions <= 0) return;
+    player.hp += 30;
+    if (player.hp > player.maxHp) player.hp = player.maxHp;
+    player.potions--;
+    log("回復薬を使った");
+    enemyAttack();
   }
 
-  update();
+  function winBattle() {
+    const gain = 20;
+    player.exp += gain;
+    log(`勝利！EXP +${gain}`);
+    if (player.exp >= 100) levelUp();
+    switchScreen("mapScreen");
+    updateStatus();
+  }
+
+  function levelUp() {
+    player.lv++;
+    player.exp = 0;
+    player.maxHp += 20;
+    player.hp = player.maxHp;
+    alert("レベルアップ！");
+  }
+
+  function log(text) {
+    logEl.innerHTML += text + "<br>";
+    document.getElementById("enemyHP").textContent = enemy.hp;
+  }
+
+  function updateStatus() {
+    document.getElementById("lv").textContent = player.lv;
+    document.getElementById("hp").textContent = player.hp;
+    document.getElementById("exp").textContent = player.exp;
+  }
+
+  function switchScreen(id) {
+    document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+    document.getElementById(id).classList.add("active");
+  }
+
+  drawMap();
+  updateStatus();
 </script>
 
 </body>
